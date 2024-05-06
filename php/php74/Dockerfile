@@ -24,6 +24,6 @@ COPY ./php.ini /etc/php/7.4/cli/conf.d/90-php.ini
 
 RUN usermod -u 1000 www-data
 
-WORKDIR "/var/www/bitrix"
+WORKDIR "/var/www"
 
 EXPOSE 9000

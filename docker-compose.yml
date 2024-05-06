@@ -1,8 +1,13 @@
 ---
 services:
     php:
-        build: ./php/${PHP_VERSION}
-        container_name: php
+        build:
+            context: ./php/${PHP_VERSION}
+            args:
+                XDEBUG_VERSION: ${XDEBUG_VERSION:-3.0.0}
+                XDEBUG_MODE: ${XDEBUG_MODE:-off}
+                COMPOSER_VERSION: ${COMPOSER_VERSION:-latest}
+        container_name: ${COMPOSE_PROJECT_NAME}_php
         volumes_from:
             - source
         links:
@@ -10,26 +15,30 @@ services:
             - memcached
         environment:
             TZ: Europe/Moscow
+            XDEBUG_CONFIG: "discover_client_host=${XDEBUG_DISCOVER_CLIENT_HOST:-false} client_host=${XDEBUG_HOST:-host.docker.internal} start_with_request=${XDEBUG_START_WITH_REQUEST:-default} remote_host=${XDEBUG_HOST:-host.docker.internal} remote_port=${XDEBUG_PORT:-9001} remote_enable=${XDEBUG_REMOTE_ENABLE:-0} default_enable=${XDEBUG_REMOTE_ENABLE:-0} remote_autostart=${XDEBUG_REMOTE_ENABLE:-0} remote_connect_back=${XDEBUG_CONNECT_BACK:-0}"
         stdin_open: true
         tty: true
         networks:
-            - bitrixdock
+            - booking
+        ports:
+            - "${INTERFACE:-127.0.0.1}:${PHP_FPM_PORT:-9000}:9000"
+            - "${INTERFACE:-127.0.0.1}:${PHP_SSH_PORT:-22}:22"
         restart: unless-stopped
 
     web_server:
         build: ./${WEB_SERVER_TYPE}
-        container_name: web_server
+        container_name: ${COMPOSE_PROJECT_NAME}_web_server
         depends_on:
             - source
         volumes_from:
             - source
         ports:
-            - '${INTERFACE}:80:80'
-            - '${INTERFACE}:443:443'
+            - "${INTERFACE:-127.0.0.1}:80:80"
+            - "${INTERFACE:-127.0.0.1}:443:443"
         links:
             - php
         networks:
-            - bitrixdock
+            - booking
         environment:
             TZ: Europe/Moscow
         stdin_open: true
@@ -38,7 +47,7 @@ services:
 
     db:
         build: ./${DB_SERVER_TYPE}
-        container_name: db
+        container_name: ${COMPOSE_PROJECT_NAME}_db
         volumes:
             - ./${DB_SERVER_TYPE}/init:/docker-entrypoint-initdb.d
         volumes_from:
@@ -53,20 +62,20 @@ services:
             TZ: Europe/Moscow
         command: mysqld --user=root --sql-mode=""
         networks:
-            - bitrixdock
+            - booking
         stdin_open: true
         tty: true
         restart: unless-stopped
 
     memcached:
         image: memcached:latest
-        container_name: memcached
+        container_name: ${COMPOSE_PROJECT_NAME}_memcached
         volumes_from:
             - source
         ports:
             - '${INTERFACE}:11211:11211'
         networks:
-            - bitrixdock
+            - booking
         environment:
             TZ: Europe/Moscow
         stdin_open: true
@@ -75,7 +84,7 @@ services:
 
     adminer:
         image: dockette/adminer:full
-        container_name: adminer
+        container_name: ${COMPOSE_PROJECT_NAME}_adminer
         links:
             - db:db
         ports:
@@ -87,11 +96,11 @@ services:
         stdin_open: true
         tty: true
         networks:
-            - bitrixdock
+            - booking
 
     source:
         image: alpine:latest
-        container_name: source
+        container_name: ${COMPOSE_PROJECT_NAME}_source
         volumes:
             - ./logs/${WEB_SERVER_TYPE}:/var/log/${WEB_SERVER_TYPE}
             - ./logs/php:/var/log/php
@@ -99,10 +108,10 @@ services:
             - ./logs/memcached:/var/log/memcached
             - db:/var/lib/mysql
             - cache:/var/lib/memcached
-            - ${SITE_PATH}:/var/www/bitrix
+            - ${SITE_PATH}:/var/www
             - /etc/localtime:/etc/localtime/:ro
         networks:
-            - bitrixdock
+            - booking
 
 volumes:
     db:
@@ -111,4 +120,5 @@ volumes:
         driver: local
 
 networks:
-    bitrixdock:
+    booking:
+        external: false
